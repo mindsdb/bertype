@@ -1,2 +1,2 @@
 # bertype
-Column type infenrece using BERT
+Type Inference using BERT.

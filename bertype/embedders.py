@@ -8,7 +8,6 @@ import datetime
 import pandas
 import numpy
 
-from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import StratifiedShuffleSplit
 
 import torch
@@ -24,9 +23,6 @@ from sentence_transformers.models import Dense
 from sentence_transformers.losses import OnlineContrastiveLoss
 from sentence_transformers.losses import BatchHardSoftMarginTripletLoss
 from sentence_transformers.evaluation import EmbeddingSimilarityEvaluator
-
-from bertype.column_info import get_types
-from bertype.column_info import get_subtypes
 
 
 def multiple_replace(replacements, text):
@@ -102,17 +98,17 @@ class ColBert:
         self.final_emb_size = 32
         self.max_length = 512
         self.batch_size = 24
-
-        # type encoder
-        self.type_encoder = LabelEncoder()
-        self.type_encoder.fit(
-            numpy.asarray(get_types()))
-        self.num_data_types = len(get_types())
-        # sub-type encoder
-        self.subtype_encoder = LabelEncoder()
-        self.subtype_encoder.fit(
-            numpy.asarray(get_subtypes()))
-        self.num_data_types = len(get_subtypes())
+        self.max_col_entry_length = 64
+        # # type encoder
+        # self.type_encoder = LabelEncoder()
+        # self.type_encoder.fit(
+        #     numpy.asarray(get_types()))
+        # self.num_data_types = len(get_types())
+        # # sub-type encoder
+        # self.subtype_encoder = LabelEncoder()
+        # self.subtype_encoder.fit(
+        #     numpy.asarray(get_subtypes()))
+        # self.num_data_types = len(get_subtypes())
         self.device = torch.device(device)
 
         if model_name is None:
@@ -161,21 +157,21 @@ class ColBert:
         """
         return self.final_emb_size
 
-    def decode_subtype(self, col_type_codes):
-        """ Transforms column sub-type codes to names.
-        """
-        x = numpy.atleast_1d(col_type_codes)
-        x = x.astype(numpy.int32)
-        col_type_names = self.subtype_encoder.inverse_transform(x)
-        return col_type_names.ravel()[0]
+    # def decode_subtype(self, col_type_codes):
+    #     """ Transforms column sub-type codes to names.
+    #     """
+    #     x = numpy.atleast_1d(col_type_codes)
+    #     x = x.astype(numpy.int32)
+    #     col_type_names = self.subtype_encoder.inverse_transform(x)
+    #     return col_type_names.ravel()[0]
 
-    def decode_type(self, col_type_codes):
-        """ Transforms column type codes to names.
-        """
-        x = numpy.atleast_1d(col_type_codes)
-        x = x.astype(numpy.int32)
-        col_type_names = self.type_encoder.inverse_transform(x)
-        return col_type_names.ravel()[0]
+    # def decode_type(self, col_type_codes):
+    #     """ Transforms column type codes to names.
+    #     """
+    #     x = numpy.atleast_1d(col_type_codes)
+    #     x = x.astype(numpy.int32)
+    #     col_type_names = self.type_encoder.inverse_transform(x)
+    #     return col_type_names.ravel()[0]
 
     def column_to_sentences(self, column_data: pandas.Series):
         """ Converts a series into chunks of smaller sentences.
@@ -196,8 +192,8 @@ class ColBert:
         sentences = []
         # replace *actual* NaN/NaT/None with missing keyword
         column_data = column_data.fillna('__missing__')
-        # trucate entires to have 96 characters.
-        column_data = column_data.astype(str).str.slice(0, 96)
+        # trucate entries to have limited number of characters
+        column_data = column_data.astype(str).str.slice(0, self.max_col_entry_length)
 
         # convert column to a (possibly very) long string
         long_string = column_data.to_string(index=False, header=False)
@@ -264,7 +260,7 @@ class ColBert:
         column_data = column_data.fillna('__missing__')
         sentences = self.column_to_sentences(column_data)
         labels = numpy.asarray([column_type for _ in sentences]).ravel()
-        labels = self.type_encoder.transform(labels)
+        # labels = self.type_encoder.transform(labels)
         labels = labels.ravel().tolist()
 
         self.sentence_list += sentences
